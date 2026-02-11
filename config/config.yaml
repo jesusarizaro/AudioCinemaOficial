@@ -1,0 +1,16 @@
+audio:
+  samplerate: 48000
+  input_device: null
+  record_seconds: 5.0
+system_layout: "5.1"
+analysis:
+  criteria: "Medium (Δ<= 6dB) & (Best Corr >= 0.50)"
+thingsboard:
+  enabled: false
+  server: "thingsboard.cloud"
+  port: 1883
+  token: ""
+paths:
+  noise_wav: "data/noise.wav"
+  ref_wav: "data/ref.wav"
+  test_wav: "data/test.wav"

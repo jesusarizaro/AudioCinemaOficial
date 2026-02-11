@@ -1,0 +1,5 @@
+{
+  "server": "thingsboard.cloud",
+  "port": 1883,
+  "token": ""
+}

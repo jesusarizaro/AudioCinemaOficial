@@ -1,0 +1,8 @@
+[Unit]
+Description=AudioCinema scheduled doctor check
+After=default.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/code
+ExecStart=%h/code/venv/bin/python %h/code/src/main.py --doctor

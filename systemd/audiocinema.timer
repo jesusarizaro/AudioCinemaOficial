@@ -1,0 +1,11 @@
+[Unit]
+Description=Run AudioCinema doctor periodically
+
+[Timer]
+OnBootSec=3m
+OnUnitActiveSec=12h
+Persistent=true
+Unit=audiocinema.service
+
+[Install]
+WantedBy=timers.target
