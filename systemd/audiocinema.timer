@@ -1,9 +1,8 @@
 [Unit]
-Description=Run AudioCinema doctor periodically
+Description=Run AudioCinema automation periodically
 
 [Timer]
-OnBootSec=3m
-OnUnitActiveSec=12h
+OnCalendar=Mon..Fri *-*-* 08:00:00
 Persistent=true
 Unit=audiocinema.service
 
