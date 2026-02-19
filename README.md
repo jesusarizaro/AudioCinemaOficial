@@ -5,7 +5,7 @@ Reempaque de `freq24.py` como aplicación instalable Linux, manteniendo la lógi
 ## Estructura
 
 - `src/gui_app.py`: GUI principal (monolito original adaptado a rutas de proyecto).
-- `src/main.py`: CLI con `--setup` y `--doctor`.
+- `src/main.py`: CLI con `--setup`, `--doctor` y `--autorun`.
 - `src/doctor.py`: verificación de entorno.
 - `src/configio.py`: lectura/escritura YAML (`config/config.yaml`).
 - `src/app_platform.py`: rutas de plataforma y creación de directorios.
@@ -76,6 +76,24 @@ Si no colocas estos archivos, el doctor reportará advertencias o errores claros
 - Revisa `server/port/token` en GUI.
 - Verifica conectividad de red y credenciales.
 
+### Programación automática (sin GUI)
+
+- En la GUI ahora existe la sección **Automation schedule (systemd --user)**.
+- Ahí puedes definir:
+  - `Days`: por ejemplo `Mon,Tue,Wed,Thu,Fri`
+  - `Hour`: por ejemplo `08:00`
+- Con **Apply schedule** se guarda la configuración y se actualiza:
+  - `~/.config/systemd/user/audiocinema.service`
+  - `~/.config/systemd/user/audiocinema.timer`
+- El service ejecuta `python src/main.py --autorun`.
+- Flujo de `--autorun`:
+  1. Record TEST
+  2. Analyze REF
+  3. Analyze TEST
+  4. Evaluate
+  5. ThingsBoard
+
+
 ## Desinstalación
 
 ```bash
@@ -83,3 +101,4 @@ Si no colocas estos archivos, el doctor reportará advertencias o errores claros
 ```
 
 Esto elimina desktop entry, icono de usuario, unidades systemd de usuario y `venv/`.
+
