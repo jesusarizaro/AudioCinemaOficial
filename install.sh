@@ -77,6 +77,32 @@ if command -v update-desktop-database >/dev/null 2>&1; then
 fi
 
 echo "[6/8] Setup de la app"
+ROOT_DIR_ENV="$ROOT_DIR" python - <<'PY'
+import os
+from pathlib import Path
+
+root_dir = Path(os.environ["ROOT_DIR_ENV"])
+targets = [root_dir / "src", root_dir / "systemd"]
+bad_chars = {
+    "\u240a": "SYMBOL FOR LINE FEED",
+    "\u240d": "SYMBOL FOR CARRIAGE RETURN",
+    "\u2424": "SYMBOL FOR NEWLINE",
+}
+
+for root in targets:
+    if not root.exists():
+        continue
+    for path in root.rglob("*"):
+        if path.suffix not in {".py", ".service", ".timer", ".sh"}:
+            continue
+        text = path.read_text(encoding="utf-8")
+        cleaned = text
+        for bad in bad_chars:
+            cleaned = cleaned.replace(bad, "")
+        if cleaned != text:
+            path.write_text(cleaned, encoding="utf-8", newline="\n")
+            print(f"[SANITIZE] Removed visible control symbols from {path}")
+PY
 python "$ROOT_DIR/src/main.py" --setup
 
 echo "[7/8] Verificacion doctor"
