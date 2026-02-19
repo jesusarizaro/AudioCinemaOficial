@@ -3,9 +3,10 @@ from __future__ import annotations
 import argparse
 import sys
 
-from app_platform import ASSETS_DIR, CFG_DIR, DATA_DIR, REP_DIR, ensure_dirs
-from configio import load_config, save_config
-from doctor import run_doctor
+from app_platform import ASSETS_DIR, CFG_DIR, DATA_DIR, REP_DIR, ensure_dirs␊
+from configio import load_config, save_config␊
+from doctor import run_doctor␊
+
 
 
 def run_setup() -> int:
@@ -33,6 +34,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="AudioCinema CLI")
     parser.add_argument("--setup", action="store_true", help="Inicializa carpetas/config por defecto")
     parser.add_argument("--doctor", action="store_true", help="Ejecuta verificaciones de entorno")
+    parser.add_argument("--autorun", action="store_true", help="Ejecuta flujo automatico sin GUI")
     return parser
 
 
@@ -46,9 +48,14 @@ def main() -> int:
     if args.doctor:
         return run_doctor()
 
+    if args.autorun:
+        from automation_runner import run_automation
+        return run_automation()
+
     parser.print_help()
     return 0
 
 
 if __name__ == "__main__":
     sys.exit(main())
+
