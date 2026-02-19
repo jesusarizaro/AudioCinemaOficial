@@ -35,6 +35,7 @@
 
 import json
 import os
+import subprocess
 import threading
 import queue
 import wave
@@ -71,6 +72,7 @@ from app_platform import APP_DIR, CFG_DIR, DATA_DIR, ASSETS_DIR, ensure_dirs
 
 BASE_DIR = APP_DIR
 TB_CONFIG_PATH = os.path.join(CFG_DIR, "tb_config.json")
+AUTORUN_CONFIG_PATH = os.path.join(CFG_DIR, "autorun_config.json")
 DEFAULT_WAV_PATHS = {
     "noise": os.path.join(DATA_DIR, "noise.wav"),
     "ref": os.path.join(DATA_DIR, "ref.wav"),
@@ -2217,7 +2219,7 @@ def analyze_track(
 # ============================================================
 # GUI
 # ============================================================
-class AudioCompareGUI:
+class AudioCompareGUI:␊
     def __init__(self, root: tk.Tk):
         self.root = root
         self.system_var = tk.StringVar(value="5.1")
@@ -2244,6 +2246,10 @@ class AudioCompareGUI:
         self.tb_port_var.trace_add("write", self._on_tb_config_change)
         self.tb_token_var.trace_add("write", self._on_tb_config_change)
 
+        autorun_cfg = self._load_autorun_config()
+        self.autorun_days_var = tk.StringVar(value=autorun_cfg.get("days", "Mon,Tue,Wed,Thu,Fri"))
+        self.autorun_time_var = tk.StringVar(value=autorun_cfg.get("time", "08:00"))
+        
         self.last_tb_payload = None
 
 
@@ -2311,6 +2317,18 @@ class AudioCompareGUI:
 
         ttk.Label(tb_frame, text="Token:").grid(row=0, column=4, sticky="w")
         ttk.Entry(tb_frame, textvariable=self.tb_token_var, width=36).grid(row=0, column=5, sticky="w", padx=(6, 0))
+
+        # ---------------- Automation schedule ----------------
+        auto_frame = ttk.LabelFrame(root, text="Automation schedule (systemd --user)", padding=10)
+        auto_frame.pack(fill="x", padx=10, pady=(0, 10))
+
+        ttk.Label(auto_frame, text="Days (Mon,Tue,...):").grid(row=0, column=0, sticky="w")
+        ttk.Entry(auto_frame, textvariable=self.autorun_days_var, width=26).grid(row=0, column=1, sticky="w", padx=(6, 18))
+
+        ttk.Label(auto_frame, text="Hour (HH:MM):").grid(row=0, column=2, sticky="w")
+        ttk.Entry(auto_frame, textvariable=self.autorun_time_var, width=10).grid(row=0, column=3, sticky="w", padx=(6, 18))
+
+        ttk.Button(auto_frame, text="Apply schedule", command=self.apply_automation_schedule).grid(row=0, column=4, sticky="w")
 
 
 
@@ -2499,7 +2517,7 @@ class AudioCompareGUI:
             return {}
         return data if isinstance(data, dict) else {}
 
-    def _save_tb_config(self) -> None:
+    def _save_tb_config(self) -> None:␊
         data = {
             "server": self.tb_server_var.get().strip(),
             "port": self.tb_port_var.get().strip(),
@@ -2510,6 +2528,89 @@ class AudioCompareGUI:
                 json.dump(data, handle, indent=2)
         except OSError:
             pass
+
+    def _load_autorun_config(self) -> dict:
+        if not os.path.exists(AUTORUN_CONFIG_PATH):
+            return {}
+        try:
+            with open(AUTORUN_CONFIG_PATH, "r", encoding="utf-8") as handle:
+                data = json.load(handle)
+        except (OSError, json.JSONDecodeError):
+            return {}
+        return data if isinstance(data, dict) else {}
+
+    def _save_autorun_config(self, days: str, hour: str) -> None:
+        data = {
+            "enabled": True,
+            "days": days,
+            "time": hour,
+        }
+        try:
+            with open(AUTORUN_CONFIG_PATH, "w", encoding="utf-8") as handle:
+                json.dump(data, handle, indent=2)
+        except OSError:
+            pass
+
+    def apply_automation_schedule(self) -> None:
+        days = self.autorun_days_var.get().strip()
+        hour = self.autorun_time_var.get().strip()
+        if not days:
+            messagebox.showerror("Automation", "Days cannot be empty.")
+            return
+        if len(hour) != 5 or hour[2] != ":":
+            messagebox.showerror("Automation", "Invalid hour format. Use HH:MM")
+            return
+
+        unit_dir = os.path.expanduser("~/.config/systemd/user")
+        os.makedirs(unit_dir, exist_ok=True)
+        py_path = os.path.join(APP_DIR, "venv", "bin", "python")
+        if not os.path.exists(py_path):
+            py_path = "python3"
+
+        service_body = "\n".join([
+            "[Unit]",
+            "Description=AudioCinema automated run",
+            "After=default.target",
+            "",
+            "[Service]",
+            "Type=oneshot",
+            f"WorkingDirectory={APP_DIR}",
+            f"ExecStart={py_path} {os.path.join(APP_DIR, 'src', 'main.py')} --autorun",
+            "",
+        ])
+        timer_body = "\n".join([
+            "[Unit]",
+            "Description=Run AudioCinema automatic pipeline",
+            "",
+            "[Timer]",
+            f"OnCalendar={days} *-*-* {hour}:00",
+            "Persistent=true",
+            "Unit=audiocinema.service",
+            "",
+            "[Install]",
+            "WantedBy=timers.target",
+            "",
+        ])
+
+        service_path = os.path.join(unit_dir, "audiocinema.service")
+        timer_path = os.path.join(unit_dir, "audiocinema.timer")
+        with open(service_path, "w", encoding="utf-8") as handle:
+            handle.write(service_body)
+        with open(timer_path, "w", encoding="utf-8") as handle:
+            handle.write(timer_body)
+
+        self._save_autorun_config(days, hour)
+
+        try:
+            subprocess.run(["systemctl", "--user", "daemon-reload"], check=True)
+            subprocess.run(["systemctl", "--user", "enable", "--now", "audiocinema.timer"], check=True)
+        except Exception as exc:
+            messagebox.showwarning("Automation", f"Schedule saved but systemd enable failed: {exc}")
+            self.status_var.set("Automation schedule saved (systemd pending).")
+            return
+
+        self.status_var.set(f"Automation enabled: {days} {hour}")
+        messagebox.showinfo("Automation", "Schedule applied and timer enabled.")
 
     def _on_tb_config_change(self, *_args) -> None:
         self._save_tb_config()
@@ -4148,3 +4249,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
