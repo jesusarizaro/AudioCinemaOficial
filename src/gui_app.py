@@ -2250,7 +2250,7 @@ class AudioCompareGUI:␊
 
         autorun_cfg = self._load_autorun_config()
         self.autorun_days_var = tk.StringVar(value=autorun_cfg.get("days", "Mon,Tue,Wed,Thu,Fri"))
-        self.autorun_time_var = tk.StringVar(value=autorun_cfg.get("time", "08:00"))
+        self.autorun_time_var = tk.StringVar(value=autorun_cfg.get("time", "08:00:00"))
         
         self.last_tb_payload = None
 
@@ -2333,7 +2333,7 @@ class AudioCompareGUI:␊
         ttk.Label(auto_frame, text="Days (Mon,Tue,...):").grid(row=0, column=0, sticky="w")
         ttk.Entry(auto_frame, textvariable=self.autorun_days_var, width=26).grid(row=0, column=1, sticky="w", padx=(6, 18))
 
-        ttk.Label(auto_frame, text="Hour (HH:MM):").grid(row=0, column=2, sticky="w")
+        ttk.Label(auto_frame, text="Hour (HH:MM:SS):").grid(row=0, column=2, sticky="w")
         ttk.Entry(auto_frame, textvariable=self.autorun_time_var, width=10).grid(row=0, column=3, sticky="w", padx=(6, 18))
 
         ttk.Button(auto_frame, text="Apply schedule", command=self.apply_automation_schedule).grid(row=0, column=4, sticky="w")
@@ -2641,8 +2641,22 @@ class AudioCompareGUI:␊
         if not days:
             messagebox.showerror("Automation", "Days cannot be empty.")
             return
-        if len(hour) != 5 or hour[2] != ":":
-            messagebox.showerror("Automation", "Invalid hour format. Use HH:MM")
+
+        # backward-compatible: if user enters HH:MM, normalize to HH:MM:SS
+        if len(hour) == 5 and hour[2] == ":":
+            hour = f"{hour}:00"
+            self.autorun_time_var.set(hour)
+
+        if len(hour) != 8 or hour[2] != ":" or hour[5] != ":":
+            messagebox.showerror("Automation", "Invalid hour format. Use HH:MM:SS")
+            return
+        try:
+            hh, mm, ss = [int(part) for part in hour.split(":")]
+        except ValueError:
+            messagebox.showerror("Automation", "Invalid hour format. Use HH:MM:SS")
+            return
+        if not (0 <= hh <= 23 and 0 <= mm <= 59 and 0 <= ss <= 59):
+            messagebox.showerror("Automation", "Hour out of range. Use HH:MM:SS (24h)")
             return
 
         unit_dir = os.path.expanduser("~/.config/systemd/user")
@@ -2667,7 +2681,7 @@ class AudioCompareGUI:␊
             "Description=Run AudioCinema automatic pipeline",
             "",
             "[Timer]",
-            f"OnCalendar={days} *-*-* {hour}:00",
+            f"OnCalendar={days} *-*-* {hour}",
             "Persistent=true",
             "Unit=audiocinema.service",
             "",
@@ -4333,5 +4347,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
