@@ -86,6 +86,8 @@ Si no colocas estos archivos, el doctor reportará advertencias o errores claros
   - `~/.config/systemd/user/audiocinema.service`
   - `~/.config/systemd/user/audiocinema.timer`
 - El service ejecuta `python src/main.py --autorun`.
+- El modo autorun usa la misma configuración guardada desde el menú (FS, Duration,
+  layout, criterios, timing, marcadores y filtro) en `config/config.yaml`.
 - Flujo de `--autorun`:
   1. Record TEST
   2. Analyze REF
@@ -101,4 +103,5 @@ Si no colocas estos archivos, el doctor reportará advertencias o errores claros
 ```
 
 Esto elimina desktop entry, icono de usuario, unidades systemd de usuario y `venv/`.
+
 
