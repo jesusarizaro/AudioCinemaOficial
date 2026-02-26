@@ -39,6 +39,7 @@ import subprocess
 import threading
 import queue
 import wave
+from datetime import datetime
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 
@@ -57,7 +58,7 @@ import importlib.util
 
 import paho.mqtt.client as mqtt
 
-from app_platform import APP_DIR, CFG_DIR, DATA_DIR, ASSETS_DIR, ensure_dirs
+from app_platform import APP_DIR, CFG_DIR, DATA_DIR, REP_DIR, ASSETS_DIR, ensure_dirs
 from configio import load_config, save_config
 
 
@@ -3020,9 +3021,21 @@ class AudioCompareGUI:␊
             else:
                 missing.append(name)
         base_msg = f"WAVs: {', '.join(existing) if existing else 'none'}"
+
         if missing:
             base_msg = f"{base_msg} | Missing: {', '.join(missing)}"
         self.file_status_var.set(base_msg)
+
+    def _archive_wav_report(self, key: str, fs: int, x: np.ndarray, source: str) -> str:
+        ensure_dirs()
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        key_norm = {"noise": "NOISE", "ref": "REF", "tst": "TEST"}.get(key, key.upper())
+        source_norm = (source or "manual").strip().replace(" ", "_")
+        filename = f"{ts}_{key_norm}_{source_norm}.wav"
+        out_path = os.path.join(REP_DIR, filename)
+        save_wav_mono(out_path, fs, x)
+        return out_path
+
 
     def load_saved_wavs(self):
         loaded = []
@@ -3065,6 +3078,7 @@ class AudioCompareGUI:␊
             try:
                 fs, x = load_wav_mono(path)
                 save_wav_mono(self.wav_paths[key], fs, x)
+                self._archive_wav_report(key, fs, x, source="import")
             except Exception as exc:
                 messagebox.showerror("Import error", f"Failed to import {key.upper()}: {exc}")
                 continue
@@ -3824,6 +3838,7 @@ class AudioCompareGUI:␊
                         self.ref_analysis = None
                         try:
                             save_wav_mono(self.wav_paths["ref"], fs, x)
+                            self._archive_wav_report("ref", fs, x, source="record")
                         except Exception as exc:
                             messagebox.showwarning("Save warning", f"REF save failed: {exc}")
                         self.status_var.set("✅ Reference recorded.")
@@ -3832,6 +3847,7 @@ class AudioCompareGUI:␊
                         self.tst_analysis = None
                         try:
                             save_wav_mono(self.wav_paths["tst"], fs, x)
+                            self._archive_wav_report("tst", fs, x, source="record")
                         except Exception as exc:
                             messagebox.showwarning("Save warning", f"TEST save failed: {exc}")
                         self.status_var.set("✅ Test recorded.")
@@ -3842,6 +3858,7 @@ class AudioCompareGUI:␊
                     self.x_noise = (fs, x)
                     try:
                         save_wav_mono(self.wav_paths["noise"], fs, x)
+                        self._archive_wav_report("noise", fs, x, source="record")
                     except Exception as exc:
                         messagebox.showwarning("Save warning", f"NOISE save failed: {exc}")
                     self.status_var.set("✅ Noise recorded.")
@@ -4347,6 +4364,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
