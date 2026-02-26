@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime
 import numpy as np
 
-from app_platform import APP_DIR, CFG_DIR
+from app_platform import APP_DIR, CFG_DIR, REP_DIR, ensure_dirs
 
 from gui_app import (
     BAND_RANGES_HZ,
@@ -232,6 +233,11 @@ def run_automation() -> int:
     print("[AUTORUN] Paso 1/5: Record TEST")
     x_test = record_audio(duration_s=duration, fs=fs, device=device)
     save_wav_mono(str(test_path), fs, x_test)
+    ensure_dirs()
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    report_test_path = REP_DIR / f"{ts}_TEST_autorun.wav"
+    save_wav_mono(str(report_test_path), fs, x_test)
+    
 
     print("[AUTORUN] Paso 2/5: Analyze REF")
     fs_ref, x_ref = load_wav_mono(str(ref_path))
