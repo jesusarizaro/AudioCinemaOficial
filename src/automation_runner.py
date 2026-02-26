@@ -55,22 +55,26 @@ def _load_tb_config() -> dict:
 
 
 def _analyze(x: list, fs: int, layout: str) -> dict:
+    cfg = _load_yaml_config()
+    timing_cfg = cfg.get("timing", {}) if isinstance(cfg.get("timing"), dict) else {}
+    analysis_cfg = cfg.get("analysis", {}) if isinstance(cfg.get("analysis"), dict) else {}
+    marker_cfg = cfg.get("markers", {}) if isinstance(cfg.get("markers"), dict) else {}
     sys_cfg = SYSTEM_LAYOUTS.get(layout, SYSTEM_LAYOUTS["5.1"])
     return analyze_track(
         x=x,
         fs=fs,
-        f_start=3000.0,
-        f_ch_marker=4500.0,
-        f_end=3000.0,
+        f_start=float(marker_cfg.get("start_hz", 3000.0)),
+        f_ch_marker=float(marker_cfg.get("channel_marker_hz", 4500.0)),
+        f_end=float(marker_cfg.get("end_hz", 3000.0)),
         channel_count=sys_cfg["channels"],
         channel_order=sys_cfg["order"],
-        start_to_ch1_s=4.0,
-        spacing_s=16.0,
-        time_radius_s=1.0,
-        offset_in_channel_s=3.0,
-        channel_len_s=11.0,
-        guard_s=0.05,
-        freq_tol_hz=100.0,
+        start_to_ch1_s=float(timing_cfg.get("start_to_ch1_s", 4.0)),
+        spacing_s=float(timing_cfg.get("spacing_s", 16.0)),
+        time_radius_s=float(timing_cfg.get("radius_s", 1.0)),
+        offset_in_channel_s=float(timing_cfg.get("offset_s", 3.0)),
+        channel_len_s=float(timing_cfg.get("channel_len_s", 11.0)),
+        guard_s=float(timing_cfg.get("guard_s", 0.05)),
+        freq_tol_hz=float(analysis_cfg.get("freq_tol_hz", 100.0)),
     )
 
 
@@ -213,6 +217,7 @@ def _compute_band_results(
 def run_automation() -> int:
     cfg = _load_yaml_config()
     audio_cfg = cfg.get("audio", {}) if isinstance(cfg.get("audio"), dict) else {}
+    analysis_cfg = cfg.get("analysis", {}) if isinstance(cfg.get("analysis"), dict) else {}
     layout = str(cfg.get("system_layout", "5.1")).strip() or "5.1"
     fs = int(audio_cfg.get("samplerate", 48000))
     duration = float(audio_cfg.get("record_seconds", 110.0))
@@ -296,7 +301,7 @@ def run_automation() -> int:
             fR,
             tT,
             fT,
-            tol_hz=100.0,
+            tol_hz=float(analysis_cfg.get("freq_tol_hz", 100.0)),
             max_lag_s=3,
             min_valid_frac=0.75,
             pctl_err=90.0,
