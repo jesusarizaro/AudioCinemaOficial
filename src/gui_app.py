@@ -58,8 +58,7 @@ import importlib.util
 import paho.mqtt.client as mqtt
 
 from app_platform import APP_DIR, CFG_DIR, DATA_DIR, ASSETS_DIR, ensure_dirs
-
-
+from configio import load_config, save_config
 
 
 
@@ -2222,7 +2221,10 @@ def analyze_track(
 class AudioCompareGUI:␊
     def __init__(self, root: tk.Tk):
         self.root = root
-        self.system_var = tk.StringVar(value="5.1")
+        self.cfg_path = os.path.join(CFG_DIR, "config.yaml")
+        self.runtime_cfg = load_config(self.cfg_path)
+
+        self.system_var = tk.StringVar(value=str(self.runtime_cfg.get("system_layout", "5.1")))
         self.expected_channels = SYSTEM_LAYOUTS["5.1"]["channels"]
         self.expected_beeps = SYSTEM_LAYOUTS["5.1"]["beeps"]
         self.channel_order = list(SYSTEM_LAYOUTS["5.1"]["order"])
@@ -2280,21 +2282,27 @@ class AudioCompareGUI:␊
         params = ttk.Frame(root, padding=(10, 0, 10, 10))
         params.pack(fill="x")
 
+        audio_cfg = self.runtime_cfg.get("audio", {}) if isinstance(self.runtime_cfg.get("audio"), dict) else {}
+        analysis_cfg = self.runtime_cfg.get("analysis", {}) if isinstance(self.runtime_cfg.get("analysis"), dict) else {}
+        timing_cfg = self.runtime_cfg.get("timing", {}) if isinstance(self.runtime_cfg.get("timing"), dict) else {}
+        marker_cfg = self.runtime_cfg.get("markers", {}) if isinstance(self.runtime_cfg.get("markers"), dict) else {}
+        filter_cfg = self.runtime_cfg.get("filter", {}) if isinstance(self.runtime_cfg.get("filter"), dict) else {}
+
         ttk.Label(params, text="FS (Hz):").grid(row=0, column=0, sticky="w")
-        self.fs_var = tk.StringVar(value="48000")
+        self.fs_var = tk.StringVar(value=str(audio_cfg.get("samplerate", 48000)))
         ttk.Entry(params, textvariable=self.fs_var, width=10).grid(row=0, column=1, sticky="w", padx=(6, 14))
 
         ttk.Label(params, text="Duration (s):").grid(row=0, column=2, sticky="w")
-        self.dur_var = tk.StringVar(value="110")
+        self.dur_var = tk.StringVar(value=str(audio_cfg.get("record_seconds", 110)))
         ttk.Entry(params, textvariable=self.dur_var, width=10).grid(row=0, column=3, sticky="w", padx=(6, 14))
 
         ttk.Label(params, text="REF vs TEST thr (Hz):").grid(row=0, column=4, sticky="w")
-        self.thr_match_var = tk.StringVar(value="50")
+        self.thr_match_var = tk.StringVar(value=str(analysis_cfg.get("ref_vs_test_thr_hz", 50)))
         ttk.Entry(params, textvariable=self.thr_match_var, width=10).grid(row=0, column=5, sticky="w", padx=(6, 0))
 
 
         ttk.Label(params, text="Evaluation criteria").grid(row=1, column=0, sticky="w", pady=(6, 0))
-        self.band_criteria_var = tk.StringVar(value=DEFAULT_BAND_CRITERIA)
+        self.band_criteria_var = tk.StringVar(value=str(analysis_cfg.get("criteria", DEFAULT_BAND_CRITERIA)))
         self.band_criteria_combo = ttk.Combobox(
             params,
             textvariable=self.band_criteria_var,
@@ -2337,10 +2345,10 @@ class AudioCompareGUI:␊
         filter_frame = ttk.LabelFrame(root, text="Bandpass filter", padding=10)
         filter_frame.pack(fill="x", padx=10, pady=(0, 10))
 
-        self.filter_enabled_var = tk.BooleanVar(value=FILTER_ENABLED)
-        self.filter_low_var = tk.StringVar(value=str(FILTER_LOW_HZ))
-        self.filter_high_var = tk.StringVar(value=str(FILTER_HIGH_HZ))
-        self.filter_order_var = tk.StringVar(value=str(FILTER_ORDER))
+        self.filter_enabled_var = tk.BooleanVar(value=bool(filter_cfg.get("enabled", FILTER_ENABLED)))
+        self.filter_low_var = tk.StringVar(value=str(filter_cfg.get("low_hz", FILTER_LOW_HZ)))
+        self.filter_high_var = tk.StringVar(value=str(filter_cfg.get("high_hz", FILTER_HIGH_HZ)))
+        self.filter_order_var = tk.StringVar(value=str(filter_cfg.get("order", FILTER_ORDER)))
 
         ttk.Checkbutton(
             filter_frame,
@@ -2364,19 +2372,19 @@ class AudioCompareGUI:␊
         timing.pack(fill="x", padx=10, pady=(0, 10))
 
         ttk.Label(timing, text="Channel spacing (s):").grid(row=0, column=0, sticky="w")
-        self.spacing_var = tk.StringVar(value="16")
+        self.spacing_var = tk.StringVar(value=str(timing_cfg.get("spacing_s", 16)))
         ttk.Entry(timing, textvariable=self.spacing_var, width=10).grid(row=0, column=1, sticky="w", padx=(6, 18))
 
         ttk.Label(timing, text="Start -> Ch1 (s):").grid(row=0, column=2, sticky="w")
-        self.start_to_ch1_var = tk.StringVar(value="4")
+        self.start_to_ch1_var = tk.StringVar(value=str(timing_cfg.get("start_to_ch1_s", 4)))
         ttk.Entry(timing, textvariable=self.start_to_ch1_var, width=10).grid(row=0, column=3, sticky="w", padx=(6, 18))
 
         ttk.Label(timing, text="Search radius (s):").grid(row=0, column=4, sticky="w")
-        self.radius_var = tk.StringVar(value="1")
+        self.radius_var = tk.StringVar(value=str(timing_cfg.get("radius_s", 1)))
         ttk.Entry(timing, textvariable=self.radius_var, width=10).grid(row=0, column=5, sticky="w", padx=(6, 18))
 
         ttk.Label(timing, text="Freq tol (Hz):").grid(row=0, column=6, sticky="w")
-        self.freq_tol_var = tk.StringVar(value="100")
+        self.freq_tol_var = tk.StringVar(value=str(analysis_cfg.get("freq_tol_hz", 100)))
         ttk.Entry(timing, textvariable=self.freq_tol_var, width=10).grid(row=0, column=7, sticky="w", padx=(6, 0))
 
         # ---------------- Channel windows ----------------
@@ -2384,15 +2392,15 @@ class AudioCompareGUI:␊
         winbox.pack(fill="x", padx=10, pady=(0, 10))
 
         ttk.Label(winbox, text="Offset inside channel (s):").grid(row=0, column=0, sticky="w")
-        self.offset_var = tk.StringVar(value="3")
+        self.offset_var = tk.StringVar(value=str(timing_cfg.get("offset_s", 3)))
         ttk.Entry(winbox, textvariable=self.offset_var, width=10).grid(row=0, column=1, sticky="w", padx=(6, 18))
 
         ttk.Label(winbox, text="Channel length (s):").grid(row=0, column=2, sticky="w")
-        self.chlen_var = tk.StringVar(value="11")
+        self.chlen_var = tk.StringVar(value=str(timing_cfg.get("channel_len_s", 11)))
         ttk.Entry(winbox, textvariable=self.chlen_var, width=10).grid(row=0, column=3, sticky="w", padx=(6, 18))
 
         ttk.Label(winbox, text="Guard (s):").grid(row=0, column=4, sticky="w")
-        self.guard_var = tk.StringVar(value="0.05")
+        self.guard_var = tk.StringVar(value=str(timing_cfg.get("guard_s", 0.05)))
         ttk.Entry(winbox, textvariable=self.guard_var, width=10).grid(row=0, column=5, sticky="w", padx=(6, 0))
 
         # ---------------- Markers (Hz) ----------------
@@ -2400,16 +2408,16 @@ class AudioCompareGUI:␊
         markers.pack(fill="x", padx=10, pady=(0, 10))
 
         ttk.Label(markers, text="Start marker (Hz):").grid(row=0, column=0, sticky="w")
-        self.f_start_var = tk.StringVar(value="3000")
+        self.f_start_var = tk.StringVar(value=str(marker_cfg.get("start_hz", 3000)))
         ttk.Entry(markers, textvariable=self.f_start_var, width=10).grid(row=0, column=1, sticky="w", padx=(6, 18))
 
         self.ch_marker_label = ttk.Label(markers, text="Ch1..Ch6 marker (Hz):")
         self.ch_marker_label.grid(row=0, column=2, sticky="w")
-        self.f_ch_marker_var = tk.StringVar(value="4500")
+        self.f_ch_marker_var = tk.StringVar(value=str(marker_cfg.get("channel_marker_hz", 4500)))
         ttk.Entry(markers, textvariable=self.f_ch_marker_var, width=10).grid(row=0, column=3, sticky="w", padx=(6, 18))
 
         ttk.Label(markers, text="End marker (Hz):").grid(row=0, column=4, sticky="w")
-        self.f_end_var = tk.StringVar(value="3000")
+        self.f_end_var = tk.StringVar(value=str(marker_cfg.get("end_hz", 3000)))
         ttk.Entry(markers, textvariable=self.f_end_var, width=10).grid(row=0, column=5, sticky="w", padx=(6, 0))
 
         # ---------------- Buttons ----------------
@@ -2480,8 +2488,84 @@ class AudioCompareGUI:␊
 
         self.refresh_devices()
         self.apply_system_layout()
+        self._install_runtime_config_traces()
+        self._save_runtime_config()
         self.load_saved_wavs()
         self.root.after(100, self.poll_queue)
+
+    def _as_float(self, var: tk.Variable, default: float) -> float:
+        try:
+            return float(str(var.get()).strip())
+        except Exception:
+            return float(default)
+
+    def _as_int(self, var: tk.Variable, default: int) -> int:
+        try:
+            return int(float(str(var.get()).strip()))
+        except Exception:
+            return int(default)
+
+    def _save_runtime_config(self, *_args) -> None:
+        cfg = load_config(self.cfg_path)
+        cfg["audio"] = {
+            "samplerate": self._as_int(self.fs_var, 48000),
+            "input_device": self.get_selected_device_index(),
+            "record_seconds": self._as_float(self.dur_var, 110.0),
+        }
+        cfg["system_layout"] = self.system_var.get().strip() or "5.1"
+        cfg["analysis"] = {
+            "criteria": self.band_criteria_var.get().strip() or DEFAULT_BAND_CRITERIA,
+            "ref_vs_test_thr_hz": self._as_float(self.thr_match_var, 50.0),
+            "freq_tol_hz": self._as_float(self.freq_tol_var, 100.0),
+        }
+        cfg["timing"] = {
+            "spacing_s": self._as_float(self.spacing_var, 16.0),
+            "start_to_ch1_s": self._as_float(self.start_to_ch1_var, 4.0),
+            "radius_s": self._as_float(self.radius_var, 1.0),
+            "offset_s": self._as_float(self.offset_var, 3.0),
+            "channel_len_s": self._as_float(self.chlen_var, 11.0),
+            "guard_s": self._as_float(self.guard_var, 0.05),
+        }
+        cfg["markers"] = {
+            "start_hz": self._as_float(self.f_start_var, 3000.0),
+            "channel_marker_hz": self._as_float(self.f_ch_marker_var, 4500.0),
+            "end_hz": self._as_float(self.f_end_var, 3000.0),
+        }
+        cfg["filter"] = {
+            "enabled": bool(self.filter_enabled_var.get()),
+            "low_hz": self._as_float(self.filter_low_var, FILTER_LOW_HZ),
+            "high_hz": self._as_float(self.filter_high_var, FILTER_HIGH_HZ),
+            "order": self._as_int(self.filter_order_var, FILTER_ORDER),
+        }
+        save_config(cfg, self.cfg_path)
+
+    def _install_runtime_config_traces(self) -> None:
+        watched_vars = [
+            self.system_var,
+            self.fs_var,
+            self.dur_var,
+            self.thr_match_var,
+            self.band_criteria_var,
+            self.spacing_var,
+            self.start_to_ch1_var,
+            self.radius_var,
+            self.freq_tol_var,
+            self.offset_var,
+            self.chlen_var,
+            self.guard_var,
+            self.f_start_var,
+            self.f_ch_marker_var,
+            self.f_end_var,
+            self.filter_enabled_var,
+            self.filter_low_var,
+            self.filter_high_var,
+            self.filter_order_var,
+            self.device_var,
+        ]
+        for var in watched_vars:
+            var.trace_add("write", self._save_runtime_config)
+
+
 
 
     def apply_system_layout(self, _event=None):
@@ -4249,4 +4333,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
